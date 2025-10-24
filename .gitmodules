@@ -1,0 +1,3 @@
+[submodule "vendor/pinocchio"]
+	path = vendor/pinocchio
+	url = https://github.com/onurtuncer/pinocchio.git
