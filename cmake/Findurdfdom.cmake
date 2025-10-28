@@ -1,0 +1,37 @@
+# Expose urdfdom targets produced by add_subdirectory(urdfdom)
+set(_u_targets urdfdom_model urdfdom_sensor urdfdom_world)
+set(_have_targets TRUE)
+foreach(t IN LISTS _u_targets)
+  if(NOT TARGET ${t})
+    set(_have_targets FALSE)
+  endif()
+endforeach()
+
+# Header path comes from urdfdom_headers finder; use generator expressions
+if(NOT DEFINED urdfdom_INCLUDE_DIRS)
+  if(DEFINED URDFDOM_HEADERS_INCLUDE_DIRS)
+    set(urdfdom_INCLUDE_DIRS "${URDFDOM_HEADERS_INCLUDE_DIRS}")
+  elseif(DEFINED URDFDOM_HEADERS_INCLUDE_DIR)
+    set(urdfdom_INCLUDE_DIRS
+      "$<BUILD_INTERFACE:${URDFDOM_HEADERS_INCLUDE_DIR}>;$<INSTALL_INTERFACE:include>")
+  endif()
+endif()
+
+include(FindPackageHandleStandardArgs)
+if(_have_targets)
+  set(urdfdom_LIBRARIES urdfdom_model urdfdom_sensor urdfdom_world)
+  find_package_handle_standard_args(urdfdom REQUIRED_VARS urdfdom_INCLUDE_DIRS)
+  if(urdfdom_FOUND AND NOT TARGET urdfdom::urdfdom)
+    add_library(urdfdom::urdfdom INTERFACE IMPORTED)
+    set_target_properties(urdfdom::urdfdom PROPERTIES
+      INTERFACE_LINK_LIBRARIES "urdfdom_model;urdfdom_sensor;urdfdom_world"
+      INTERFACE_INCLUDE_DIRECTORIES "${urdfdom_INCLUDE_DIRS}")
+  endif()
+else()
+  # Fallback: guessed libs (rarely needed)
+  set(_cand_model  "${CMAKE_BINARY_DIR}/_deps/urdfdom_src-build/urdf_parser/liburdfdom_model.so")
+  set(_cand_sensor "${CMAKE_BINARY_DIR}/_deps/urdfdom_src-build/urdf_parser/liburdfdom_sensor.so")
+  set(_cand_world  "${CMAKE_BINARY_DIR}/_deps/urdfdom_src-build/urdf_parser/liburdfdom_world.so")
+  set(urdfdom_LIBRARIES "${_cand_model};${_cand_sensor};${_cand_world}")
+  find_package_handle_standard_args(urdfdom REQUIRED_VARS urdfdom_LIBRARIES)
+endif()

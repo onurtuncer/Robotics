@@ -2,6 +2,8 @@
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 
+#include <pinocchio/parsers/urdf.hpp>
+
 #include <pinocchio/spatial/se3.hpp>
 #include <pinocchio/spatial/inertia.hpp>
 
@@ -11,53 +13,78 @@
 #include <iostream>
 #include <cmath>
 
-int main()
+int main(int argc, char **argv)
 {
+    if (argc < 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " planar3.urdf\n";
+        return 1;
+    }
+
     using namespace pinocchio;
 
-    Model model;
+    const std::string urdf_path = argv[1];
 
-    // joint1 at origin (RZ)
-    Model::JointIndex j1 = model.addJoint(
-        model.getJointId("universe"),
-        JointModelRZ(),
-        SE3::Identity(),
-        "j1");
+    pinocchio::Model model;
 
-    // Link1 inertia: mass=1 kg, COM=(0.5,0,0), small rotational inertia
-    Eigen::Matrix3d J1 = Eigen::Matrix3d::Identity() * 1e-2;
-    Inertia I1(1.0, Eigen::Vector3d(0.5, 0.0, 0.0), J1);
-    model.appendBodyToJoint(j1, I1, SE3::Identity());
+    try
+    {
+        pinocchio::urdf::buildModel(urdf_path, model);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Failed to load URDF: " << e.what() << "\n";
+        return 1;
+    }
 
-    // joint2 placed 1 m along x from joint1
-    SE3 j2_placement = SE3::Identity();
-    j2_placement.translation() = Eigen::Vector3d(1.0, 0.0, 0.0);
+    std::cout << "Model name: " << model.name << "\n";
+    std::cout << "nq = " << model.nq << ", nv = " << model.nv << "\n";
+    std::cout << "Number of joints: " << model.njoints << "\n";
 
-    Model::JointIndex j2 = model.addJoint(
-        j1,
-        JointModelRZ(),
-        j2_placement,
-        "j2");
+    // Create data
+    pinocchio::Data data(model);
 
-    // Link2 inertia
-    Eigen::Matrix3d J2 = Eigen::Matrix3d::Identity() * 1e-2;
-    Inertia I2(1.0, Eigen::Vector3d(0.5, 0.0, 0.0), J2);
-    model.appendBodyToJoint(j2, I2, SE3::Identity());
+    /*  // joint1 at origin (RZ)
+     Model::JointIndex j1 = model.addJoint(
+         model.getJointId("universe"),
+         JointModelRZ(),
+         SE3::Identity(),
+         "j1");
 
-    Data data(model);
+     // Link1 inertia: mass=1 kg, COM=(0.5,0,0), small rotational inertia
+     Eigen::Matrix3d J1 = Eigen::Matrix3d::Identity() * 1e-2;
+     Inertia I1(1.0, Eigen::Vector3d(0.5, 0.0, 0.0), J1);
+     model.appendBodyToJoint(j1, I1, SE3::Identity());
 
-    // q has size model.nq  (note: nq is a field on this branch)
-    Eigen::VectorXd q = Eigen::VectorXd::Zero(model.nq);
-    q[0] = M_PI / 6.0;  // 30°
-    q[1] = -M_PI / 4.0; // -45°
+     // joint2 placed 1 m along x from joint1
+     SE3 j2_placement = SE3::Identity();
+     j2_placement.translation() = Eigen::Vector3d(1.0, 0.0, 0.0);
 
-    forwardKinematics(model, data, q);
+     Model::JointIndex j2 = model.addJoint(
+         j1,
+         JointModelRZ(),
+         j2_placement,
+         "j2");
 
-    // EE at link2 tip: +1 m along x from joint2
-    SE3 tip = SE3::Identity();
-    tip.translation() = Eigen::Vector3d(1.0, 0.0, 0.0);
+     // Link2 inertia
+     Eigen::Matrix3d J2 = Eigen::Matrix3d::Identity() * 1e-2;
+     Inertia I2(1.0, Eigen::Vector3d(0.5, 0.0, 0.0), J2);
+     model.appendBodyToJoint(j2, I2, SE3::Identity());
 
-    SE3 T_ee = data.oMi[j2] * tip;
-    std::cout << "EE position (x y z): " << T_ee.translation().transpose() << '\n';
-    return 0;
+     Data data(model);
+
+     // q has size model.nq  (note: nq is a field on this branch)
+     Eigen::VectorXd q = Eigen::VectorXd::Zero(model.nq);
+     q[0] = M_PI / 6.0;  // 30°
+     q[1] = -M_PI / 4.0; // -45°
+
+     forwardKinematics(model, data, q);
+
+     // EE at link2 tip: +1 m along x from joint2
+     SE3 tip = SE3::Identity();
+     tip.translation() = Eigen::Vector3d(1.0, 0.0, 0.0);
+
+     SE3 T_ee = data.oMi[j2] * tip;
+     std::cout << "EE position (x y z): " << T_ee.translation().transpose() << '\n';
+     return 0; */
 }
