@@ -6,10 +6,7 @@ project(mini_pinocchio_superbuild LANGUAGES CXX)
 
 # --- HACK 1: jrl-cmakemodules root paketleme hatasını sustur ---
 # Bazı jrl makroları PROJ_ADI Targets isimli bir export set bekliyor.
-# Biz hiçbir şey export etmediğimiz için
-#   INSTALL(EXPORT mini_pinocchio_superbuildTargets)
-# hatası alıyoruz. Aşağıda boş bir hedefi bu export set'e ekleyip
-# CMake'i sakinleştiriyoruz.
+# Aşağıda boş bir hedefi bu export set'e ekleyiyoruz
 
 add_library(mini_superbuild_dummy_target INTERFACE)
 install(
@@ -36,6 +33,30 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
 # Our custom finders first
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# -------------------------------------------------------------------------
+# Force ZLIB to use shared on Linux so hpp-fcl shared lib doesn't link
+# against non-PIC /usr/lib/.../libz.a
+# -------------------------------------------------------------------------
+if(UNIX AND NOT APPLE)
+  # We may already have bad values in the cache from previous runs
+  unset(ZLIB_LIBRARY CACHE)
+  unset(ZLIB_LIBRARY_RELEASE CACHE)
+  unset(ZLIB_LIBRARY_DEBUG CACHE)
+  unset(ZLIB_LIBRARIES CACHE)
+  set(ZLIB_USE_STATIC_LIBS OFF CACHE BOOL "Use shared ZLIB" FORCE)
+
+  find_package(ZLIB REQUIRED)
+
+  if (TARGET ZLIB::ZLIB)
+    # Make subsequent find_package(ZLIB) and users (Assimp/hpp-fcl)
+    # reuse the imported target instead of hardcoded .a paths.
+    set(ZLIB_LIBRARIES ZLIB::ZLIB CACHE STRING "" FORCE)
+  else()
+    # Fallback if the module is old and doesn't create a target
+    set(ZLIB_LIBRARIES "-lz" CACHE STRING "" FORCE)
+  endif()
+endif()
 
 include(FetchContent)
 
@@ -143,7 +164,36 @@ foreach(_t IN ITEMS urdfdom_model urdfdom_sensor urdfdom_world urdfdom_model_sta
   endif()
 endforeach()
 
+# -------------------- ZLIB shim (for Assimp) --------------------
+find_package(ZLIB REQUIRED)
+
+# Make sure there's an imported ZLIB::ZLIB target
+if(NOT TARGET ZLIB::ZLIB)
+  add_library(ZLIB::ZLIB UNKNOWN IMPORTED)
+  set_target_properties(ZLIB::ZLIB PROPERTIES
+    IMPORTED_LOCATION             "${ZLIB_LIBRARIES}"
+    INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_INCLUDE_DIRS}"
+  )
+endif()
+
+# Some Assimp configs expect a target named "zlib"
+if(NOT TARGET zlib)
+  add_library(zlib INTERFACE)
+  target_link_libraries(zlib INTERFACE ZLIB::ZLIB)
+endif()
+
+# Others expect a target named "zlibstatic"
+if(NOT TARGET zlibstatic)
+  add_library(zlibstatic INTERFACE)
+  target_link_libraries(zlibstatic INTERFACE ZLIB::ZLIB)
+endif()
+
+
 # -------- Assimp (mesh importer) --------
+# Tell Assimp to use system Zlib and not build contrib/zlib
+set(ASSIMP_BUILD_ZLIB          OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ZLIB_INTERNAL OFF CACHE BOOL "" FORCE)
+
 set(ASSIMP_TAG v5.4.3)
 FetchContent_Declare(assimp
   GIT_REPOSITORY https://github.com/assimp/assimp.git
@@ -216,6 +266,14 @@ set(INSTALL_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 set(BUILD_PYTHON_INTERFACE OFF CACHE BOOL "" FORCE)
 
+# hpp-fcl'i shared yerine static olarak derle
+set(HPP_FCL_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+# >>> ADD THIS BLOCK <<<
+set(ZLIB_USE_STATIC_LIBS OFF CACHE BOOL "" FORCE)
+set(ZLIB_LIBRARY "/usr/lib/x86_64-linux-gnu/libz.so" CACHE FILEPATH "" FORCE)
+
+
 FetchContent_Declare(
   hppfcl
   GIT_REPOSITORY https://github.com/humanoid-path-planner/hpp-fcl.git
@@ -270,6 +328,24 @@ list(APPEND CMAKE_PREFIX_PATH "${hppfcl_BINARY_DIR}")
 if (TARGET hpp-fcl AND NOT TARGET hpp-fcl::hpp-fcl)
   add_library(hpp-fcl::hpp-fcl ALIAS hpp-fcl)
 endif()
+
+# ---------- HPP-FCL include dizinlerini global ekle ----------
+# config.hh tipik olarak:
+#   ${hppfcl_SOURCE_DIR}/include/hpp/fcl/config.hh.in  (template)
+#   ${hppfcl_BINARY_DIR}/include/hpp/fcl/config.hh     (generate edilen)
+include_directories(
+  "${hppfcl_SOURCE_DIR}/include"
+  "${hppfcl_BINARY_DIR}/include"
+)
+
+# Pinocchio bazı yerlerde hpp-fcl::hpp-fcl bekliyor: alias oluştur.
+if(TARGET hpp-fcl AND NOT TARGET hpp-fcl::hpp-fcl)
+  add_library(hpp-fcl::hpp-fcl ALIAS hpp-fcl)
+endif()
+
+list(APPEND CMAKE_PREFIX_PATH "${hppfcl_BINARY_DIR}")
+
+
 
 
 # -------------------- Pinocchio -------------------------
