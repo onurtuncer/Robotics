@@ -98,8 +98,9 @@ endif()
 # -------------------- console_bridge ---------------------
 FetchContent_Declare(
   console_bridge
-  GIT_REPOSITORY https://github.com/ros/console_bridge.git
-  GIT_TAG        1.0.2
+ # GIT_REPOSITORY https://github.com/ros/console_bridge.git
+  GIT_REPOSITORY https://github.com/onurtuncer/console_bridge.git
+ # GIT_TAG        1.0.2
 )
 
 FetchContent_GetProperties(console_bridge)
