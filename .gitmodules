@@ -1,3 +1,7 @@
 [submodule "vendor/pinocchio"]
 	path = vendor/pinocchio
 	url = https://github.com/onurtuncer/pinocchio.git
+[submodule "vendor/console_bridge"]
+	path = vendor/console_bridge
+	url = git@github.com:onurtuncer/console_bridge.git
+	branch = master

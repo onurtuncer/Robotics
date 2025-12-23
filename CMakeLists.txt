@@ -94,41 +94,42 @@ if(UNIX)
 else()
   set(TINYXML2_LIBRARY "${tinyxml2_BINARY_DIR}/tinyxml2.lib"  CACHE FILEPATH "" FORCE)
 endif()
-
 # -------------------- console_bridge ---------------------
-FetchContent_Declare(
-  console_bridge
+#FetchContent_Declare(
+ # console_bridge
  # GIT_REPOSITORY https://github.com/ros/console_bridge.git
-  GIT_REPOSITORY https://github.com/onurtuncer/console_bridge.git
+ # GIT_REPOSITORY https://github.com/onurtuncer/console_bridge.git
  # GIT_TAG        1.0.2
-)
+#)
 
-FetchContent_GetProperties(console_bridge)
-if(NOT console_bridge_POPULATED)
-  FetchContent_Populate(console_bridge)
+#FetchContent_GetProperties(console_bridge)
+#if(NOT console_bridge_POPULATED)
+#  FetchContent_Populate(console_bridge)
 
   # --- PATCH: bump cmake_minimum_required in console_bridge CMakeLists ---
-  file(READ "${console_bridge_SOURCE_DIR}/CMakeLists.txt" _cb_cmakelists)
-
-  string(REGEX REPLACE
-    "cmake_minimum_required\\([^)]*\\)"
-    "cmake_minimum_required(VERSION 3.10)"
-    _cb_cmakelists "${_cb_cmakelists}"
-  )
-
-  file(WRITE "${console_bridge_SOURCE_DIR}/CMakeLists.txt" "${_cb_cmakelists}")
+  #file(READ "${console_bridge_SOURCE_DIR}/CMakeLists.txt" _cb_cmakelists)
+#
+  #string(REGEX REPLACE
+  #  "cmake_minimum_required\\([^)]*\\)"
+  #  "cmake_minimum_required(VERSION 3.10)"
+  #  _cb_cmakelists "${_cb_cmakelists}"
+  #)
+#
+  #file(WRITE "${console_bridge_SOURCE_DIR}/CMakeLists.txt" "${_cb_cmakelists}")
 
   # Now add console_bridge as a normal subdir
-  add_subdirectory("${console_bridge_SOURCE_DIR}" "${console_bridge_BINARY_DIR}")
-endif()
+#  add_subdirectory("${console_bridge_SOURCE_DIR}" "${console_bridge_BINARY_DIR}")
+#endif()
+
+add_subdirectory(vendor/console_bridge)
 
 # Create a stub export header in the *source* include dir because console.h
 # includes "./console_bridge_export.h" relatively.
-file(MAKE_DIRECTORY "${console_bridge_SOURCE_DIR}/include/console_bridge")
-set(_CB_EXPORT_HDR_SRC "${console_bridge_SOURCE_DIR}/include/console_bridge/console_bridge_export.h")
-if(NOT EXISTS "${_CB_EXPORT_HDR_SRC}")
-  file(WRITE "${_CB_EXPORT_HDR_SRC}" "#pragma once\n#ifndef CONSOLE_BRIDGE_DLLAPI\n#  define CONSOLE_BRIDGE_DLLAPI\n#endif\n")
-endif()
+#file(MAKE_DIRECTORY "${console_bridge_SOURCE_DIR}/include/console_bridge")
+#set(_CB_EXPORT_HDR_SRC "${console_bridge_SOURCE_DIR}/include/console_bridge/console_bridge_export.h")
+#if(NOT EXISTS "${_CB_EXPORT_HDR_SRC}")
+#  file(WRITE "${_CB_EXPORT_HDR_SRC}" "#pragma once\n#ifndef CONSOLE_BRIDGE_DLLAPI\n#  define CONSOLE_BRIDGE_DLLAPI\n#endif\n")
+#endif()
 
 # A tiny shim that provides console_bridge::log for the final link if needed.
 add_library(console_bridge_shim STATIC src/console_bridge_shim.cpp)
