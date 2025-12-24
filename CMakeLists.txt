@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.26)
 # Workaround for jrl-cmakemodules expecting this variable:
 set(CMAKE_MINIMUM_REQUIRED_VERSION 3.26)
 
-project(mini_pinocchio_superbuild LANGUAGES CXX)
+project(mini_pinocchio_superbuild VERSION 0.0.1 LANGUAGES CXX)
 
 # --- HACK 1: jrl-cmakemodules root paketleme hatasını sustur ---
 # Bazı jrl makroları PROJ_ADI Targets isimli bir export set bekliyor.
@@ -30,6 +30,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+
+set(CMAKE_SKIP_RPATH ON)
 
 # Our custom finders first
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -80,20 +82,49 @@ if(NOT TARGET Eigen3::Eigen)
 endif()
 
 # -------------------- tinyxml2 ---------------------------
-set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
-FetchContent_Declare(
-  tinyxml2
-  GIT_REPOSITORY https://github.com/leethomason/tinyxml2.git
-  GIT_TAG        10.0.0
+#set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+#FetchContent_Declare(
+#  tinyxml2
+#  GIT_REPOSITORY https://github.com/leethomason/tinyxml2.git
+#  GIT_TAG        10.0.0
+#)
+#FetchContent_MakeAvailable(tinyxml2)
+## urdfdom's FindTinyXML2.cmake uses module variables:
+#set(TINYXML2_INCLUDE_DIR "${tinyxml2_SOURCE_DIR}" CACHE PATH "" FORCE)
+#if(UNIX)
+#  set(TINYXML2_LIBRARY "${tinyxml2_BINARY_DIR}/libtinyxml2.so" CACHE FILEPATH "" FORCE)
+#else()
+#  set(TINYXML2_LIBRARY "${tinyxml2_BINARY_DIR}/tinyxml2.lib"  CACHE FILEPATH "" FORCE)
+#endif()
+
+# tinyxml2 target
+add_library(tinyxml2 STATIC vendor/tinyxml2/tinyxml2.cpp)
+target_include_directories(tinyxml2 PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/vendor/tinyxml2>
+  $<INSTALL_INTERFACE:include>
 )
-FetchContent_MakeAvailable(tinyxml2)
-# urdfdom's FindTinyXML2.cmake uses module variables:
-set(TINYXML2_INCLUDE_DIR "${tinyxml2_SOURCE_DIR}" CACHE PATH "" FORCE)
-if(UNIX)
-  set(TINYXML2_LIBRARY "${tinyxml2_BINARY_DIR}/libtinyxml2.so" CACHE FILEPATH "" FORCE)
-else()
-  set(TINYXML2_LIBRARY "${tinyxml2_BINARY_DIR}/tinyxml2.lib"  CACHE FILEPATH "" FORCE)
-endif()
+
+# Make it exportable + installable
+install(TARGETS tinyxml2
+  EXPORT urdfdomDeps
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+install(DIRECTORY vendor/tinyxml2/
+  DESTINATION include
+  FILES_MATCHING PATTERN "tinyxml2.h"
+)
+
+# Export set for dependents
+install(EXPORT urdfdomDeps
+  NAMESPACE tinyxml2::
+  DESTINATION lib/cmake/urdfdomDeps
+)
+
+set(TINYXML2_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/vendor/tinyxml2" CACHE PATH "" FORCE)
+set(TINYXML2_LIBRARY tinyxml2 CACHE STRING "" FORCE)
 
 
 add_subdirectory(vendor/console_bridge)
@@ -131,6 +162,16 @@ foreach(_t IN ITEMS urdfdom_model urdfdom_sensor urdfdom_world urdfdom_model_sta
       "$<BUILD_INTERFACE:${URDFDOM_HEADERS_INCLUDE_DIR}>"
       "$<INSTALL_INTERFACE:include>")
     target_link_libraries(${_t} PRIVATE console_bridge_shim)
+  endif()
+endforeach()
+
+#if(TARGET urdfdom_model AND TARGET tinyxml2::tinyxml2)
+#  target_link_libraries(urdfdom_model PUBLIC tinyxml2::tinyxml2)
+#endif()
+
+foreach(t urdfdom_model urdfdom_world urdfdom_sensor)
+  if(TARGET ${t})
+    target_link_libraries(${t} PUBLIC tinyxml2)
   endif()
 endforeach()
 
@@ -342,6 +383,14 @@ set(HPP_FCL_LIBRARIES hpp-fcl CACHE STRING "" FORCE)
 set(PINOCCHIO_DISABLE_JRL_PACKAGING ON CACHE BOOL "" FORCE)
 
 add_subdirectory(vendor/pinocchio)
+
+# After pinocchio targets exist:
+if(TARGET pinocchio_default)
+  target_compile_options(pinocchio_default PRIVATE
+    -Wno-maybe-uninitialized
+    -Wno-error=maybe-uninitialized
+  )
+endif()
 
 # Fix pinocchio_parsers exported include dirs (no build-abs paths)
 if(TARGET pinocchio_parsers)
